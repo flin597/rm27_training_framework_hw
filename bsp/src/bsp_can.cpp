@@ -1,4 +1,5 @@
 #include "bsp_can.hpp"
+#include "DJIMotorHandler.hpp"
 
 extern CAN_HandleTypeDef hcan1;
 extern CAN_HandleTypeDef hcan2;
@@ -39,12 +40,38 @@ void CAN_Transmit(CAN_HandleTypeDef *hcan, uint32_t Id, uint8_t *msg, uint16_t l
         // 如果邮箱已满，可以选择等待或者采取其他操作
         // 例如，可以添加一个超时机制或者直接返回错误状态
         // Monitor::instance()->Log_Messages(Monitor::WARNING, (uint8_t *)"CAN Tx Mailbox is full\r\n");
+
         return;
     }
     // TODO: 校验标准帧 ID 和 DLC (0~8)，构造帧头并调用 HAL_CAN_AddTxMessage。
-    (void)Id;
-    (void)msg;
-    (void)len;
+    if(Id>0x7FF||len>8||msg==nullptr)
+    {
+        return;
+    }
+    CAN_TxHeaderTypeDef tx_header={0};
+    tx_header.StdId=Id;
+    tx_header.IDE=CAN_ID_STD;//标准帧
+    tx_header.RTR=CAN_RTR_DATA;//数据帧
+    tx_header.DLC=len;
+    tx_header.TransmitGlobalTime = DISABLE;//不要时间戳
+    uint32_t tx_mailbox;
+    HAL_CAN_AddTxMessage(hcan,&tx_header,msg,&tx_mailbox);
 }
 
-// TODO: 实现 CAN 接收回调，根据总线和标准帧 ID 分发电机反馈。
+// TODO: 实现 CAN 接收回调，根据总线和标准帧 ID 分发电机反馈.
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+{
+    CAN_RxHeaderTypeDef rx_header;
+    uint8_t rx_data[8];
+
+    if (HAL_CAN_GetRxMessage(hcan, CAN_RX_FIFO0, &rx_header, rx_data) != HAL_OK)                         
+    {
+        return;
+    }
+
+    if(rx_header.IDE==CAN_ID_STD&&rx_header.StdId>=0x201&&rx_header.StdId<=0x208)
+    {
+        int index=rx_header.StdId-0x201;
+        DJIMotorHandler::Instance()->updateFeedback(hcan,rx_data,index);
+    }
+}
