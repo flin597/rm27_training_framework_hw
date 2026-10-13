@@ -60,6 +60,13 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/src/BMI088.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/src/DJIMotorHandler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/src/M2006.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../modules/src/LED.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../threads/src/threads.cpp        
+    ${CMAKE_CURRENT_SOURCE_DIR}/../threads/src/imuthread.cpp      
+    ${CMAKE_CURRENT_SOURCE_DIR}/../threads/src/controlthread.cpp  
+    ${CMAKE_CURRENT_SOURCE_DIR}/../threads/src/alivethread.cpp
+    #threads                                                     
+
 )
 
 # Add include paths
@@ -67,6 +74,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../bsp/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../libs/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../threads/include
 )
 
 # Add project symbols (macros)
