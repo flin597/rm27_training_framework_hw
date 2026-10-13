@@ -2,6 +2,7 @@
 #include "tx_api.h"
 #include "bsp_pwm.hpp"
 #include <cmath>
+#include "spi.h"
 
 namespace BMI088
 {
@@ -62,8 +63,16 @@ namespace BMI088
     {
         // TODO: 温度读取完成后，用 TempPid 计算加热占空比并限制到 [0, 1]。
         // 未完成前保持加热关闭。
-        (void)target_temp;
-        PWM_SetDutyRatio(&HEATING_RESISTANCE_TIM, 0.0f, HEATING_RESISTANCE_CHANNEL);
+        float current;
+        ReadAccTemperature(&current);
+        TempPid.ref = target_temp;
+        TempPid.fdb = current;
+        TempPid.UpdateResult();
+
+        float duty=TempPid.result;
+        if(duty>1.0f) duty=1.0f;
+        else if(duty<0.0f) duty=0.0f;
+        PWM_SetDutyRatio(&HEATING_RESISTANCE_TIM, duty, HEATING_RESISTANCE_CHANNEL);
     }
 
     void cBMI088::VerifyAccChipID()
@@ -104,21 +113,33 @@ namespace BMI088
     void cBMI088::VerifyAccData()
     {
         // TODO: 检查加速度数据是否有效，并更新 ACC_DATA_ERR。
+        uint8_t buf[2];                                                               
+        ReadReg(BMI088_CS_ACC, ACC_STATUS_ADDR, buf, 2);                              
+        if (buf[1] & 0x80)  self_test.ACC_DATA_ERR = false;                           
+        else                self_test.ACC_DATA_ERR = true;
     }
 
     void cBMI088::VerifyGyroData()
     {
         // TODO: 检查角速度数据是否有效，并更新 GYRO_DATA_ERR。
+        uint8_t status;                                                               
+        ReadReg(BMI088_CS_GYRO, GYRO_INT_STAT_1_ADDR, &status, 1);                    
+        if (status & 0x80)  self_test.GYRO_DATA_ERR = false;                          
+        else                self_test.GYRO_DATA_ERR = true;
     }
 
     void cBMI088::WriteReg(enum BMI088_SENSOR cs, uint8_t addr, uint8_t *data, uint8_t len)
     {
         // TODO: 根据 cs 拉低对应 GPIO 片选；按 SPI 写协议发送地址和数据，
         // 最后释放片选，并处理通信失败与必要的延时。
-        (void)cs;
-        (void)addr;
-        (void)data;
-        (void)len;
+        GPIO_TypeDef *port = (cs == BMI088_CS_ACC) ? BMI088_CS_ACC_PORT : BMI088_CS_GYRO_PORT;
+        uint16_t      pin  = (cs == BMI088_CS_ACC) ? BMI088_CS_ACC_PIN  : BMI088_CS_GYRO_PIN;    
+        uint8_t write_addr = addr & BMI088_SPI_WRITE_CODE;   // 写地址，最高位清 0                                          
+                                                                                                                          
+        HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);   // 拉低选中                                                   
+        HAL_SPI_Transmit(&BMI088_SPI, &write_addr, 1, HAL_MAX_DELAY);                                                       
+        HAL_SPI_Transmit(&BMI088_SPI, data, len, HAL_MAX_DELAY);                                                            
+        HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);     // 拉高释放
     }
 
     void cBMI088::ReadReg(enum BMI088_SENSOR cs, uint8_t addr, uint8_t *data, uint8_t len)
@@ -126,10 +147,14 @@ namespace BMI088
         // TODO: 根据 cs 拉低对应 GPIO 片选；按 SPI 读协议发送地址，
         // 丢弃加速度计返回的首个无效字节，读取 len 字节并释放片选。
         // 未实现前清零缓冲区，避免芯片 ID 校验读取未初始化数据。
-        (void)cs;
-        (void)addr;
-        if (data != nullptr)
-            for (uint8_t i = 0; i < len; ++i) data[i] = 0;
+        GPIO_TypeDef *port = (cs == BMI088_CS_ACC) ? BMI088_CS_ACC_PORT : BMI088_CS_GYRO_PORT;
+        uint16_t      pin  = (cs == BMI088_CS_ACC) ? BMI088_CS_ACC_PIN  : BMI088_CS_GYRO_PIN; 
+        uint8_t       read_addr = addr | BMI088_SPI_READ_CODE;    // 读地址，最高位置 1                                           
+                                                                                                                          
+        HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);                                                                 
+        HAL_SPI_Transmit(&BMI088_SPI, &read_addr, 1, HAL_MAX_DELAY);                                                        
+        HAL_SPI_Receive(&BMI088_SPI, data, len, HAL_MAX_DELAY);   // 这里是收                                               
+        HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);       
     }
 
     void cBMI088::Config()
@@ -205,22 +230,47 @@ namespace BMI088
 
     void cBMI088::ReadAccData(acc_data_t *data)
     {
+        if(data==nullptr) return;
         // TODO: 按 BMI088 加速度计 SPI 协议丢弃首个无效字节，拼接三轴有符号原始值，
         // 再按配置的量程换算为 m/s²，写入 data。
-        if (data != nullptr) *data = {};
+        uint8_t buf[7];
+        ReadReg(BMI088_CS_ACC, ACC_X_LSB_ADDR, buf, 7);
+        int16_t raw_x=(int16_t)((buf[2]<<8)|buf[1]);
+        int16_t raw_y=(int16_t)((buf[4]<<8)|buf[3]);
+        int16_t raw_z=(int16_t)((buf[6]<<8)|buf[5]);
+        data->x=raw_x*IMU_ACCEL_6G_SEN;
+        data->y=raw_y*IMU_ACCEL_6G_SEN;
+        data->z=raw_z*IMU_ACCEL_6G_SEN;
+        ReadAccTemperature(&data->temperature);
     }
 
     void cBMI088::ReadGyroData(gyro_data_t *data)
     {
+        if(data==nullptr) return;
         // TODO: 读取并拼接陀螺仪三轴原始值，按配置量程换算为 rad/s，
         // 减去 Gyro_offset 后写入 data。
-        if (data != nullptr) *data = {};
+        uint8_t buf[6];
+        ReadReg(BMI088_CS_GYRO, GYRO_RATE_X_LSB_ADDR, buf, 6);
+        int16_t raw_x = (int16_t)((buf[1] << 8) | buf[0]);
+        int16_t raw_y = (int16_t)((buf[3] << 8) | buf[2]);
+        int16_t raw_z = (int16_t)((buf[5] << 8) | buf[4]);
+        float wx = raw_x * IMU_GYRO_2000_SEN;
+        float wy = raw_y * IMU_GYRO_2000_SEN;
+        float wz = raw_z * IMU_GYRO_2000_SEN;
+        data->x = wx - Gyro_offset[0];                                                
+        data->y = wy - Gyro_offset[1];                                                
+        data->z = wz - Gyro_offset[2];
     }
 
     void cBMI088::ReadAccTemperature(float *temp)
     {
+        if(temp==nullptr) return;
         // TODO: 丢弃加速度计读取时的首个无效字节，解析 11 位有符号温度并换算为摄氏度。
-        if (temp != nullptr) *temp = 0.0f;
+        uint8_t buf[3];                                                               
+        ReadReg(BMI088_CS_ACC, TEMP_MSB_ADDR, buf, 3);
+        int16_t temp_raw = (int16_t)((buf[1] << 3) | (buf[2] >> 5)); 
+        if (temp_raw > 1023) temp_raw -= 2048;
+        *temp = temp_raw * TEMP_UNIT + TEMP_BIAS;
     }
 
 }
