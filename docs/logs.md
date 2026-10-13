@@ -37,6 +37,10 @@
 - TIM8_CH3 = PI7，50 Hz（PSC=167、ARR=19999，脉宽 500~2500 = 0.5~2.5 ms）
 - 暂无实体舵机，接线：信号→PI7、电源→5V、地→GND
 
+### TIM10（BMI088 加热电阻，补漏）
+- TIM10_CH1 = PF6，PWM（PSC=167、ARR=999 → 1 kHz），供 BMI088 的 TemperatureControl 加热用
+- 坑：配置清单未列出，但框架 BMI088.hpp 引用了 htim10，编译时才暴露；CubeMX 默认引脚又是 PB8（错），板子实际是 PF6
+
 ### ThreadX + 堆栈
 - 启用 X-CUBE-AZRTOS-F4 ThreadX 核心，节拍 1000 Hz（1 ms）
 - HAL 时基：SysTick → TIM6（避免与 ThreadX 抢 SysTick）

@@ -23,7 +23,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "bsp.hpp"
 
+extern void Threads_Init(void);//不直接写"threads.hpp"，因为它是 C++ 的头文件，C 里直接 include 会报错.而Threads_Init已经包含在extern "C" 里了，所以可以直接用
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,6 +65,8 @@ UINT App_ThreadX_Init(VOID *memory_ptr)
 
   /* USER CODE BEGIN App_ThreadX_Init */
   (void)byte_pool;
+  bsp_Init();//初始化USART和CAN//创建信号量+启动3个线程
+  Threads_Init();
   /* USER CODE END App_ThreadX_Init */
 
   return ret;
