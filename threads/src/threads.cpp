@@ -10,9 +10,9 @@ static TX_THREAD control_thread;
 static TX_THREAD alive_thread;
 
 //定义三块栈，作为每个线程的独立仓库
-static ULONG imu_stack[256];//ULONG是threadX/RTOS常用的长整型类型
-static ULONG control_stack[256];
-static ULONG alive_stack[256];
+static ULONG imu_stack[1024];//ULONG是threadX/RTOS常用的长整型类型
+static ULONG control_stack[1024];
+static ULONG alive_stack[1024];
 
 void Threads_Init()
 {

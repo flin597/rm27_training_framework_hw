@@ -1,6 +1,7 @@
 #ifndef THREADS_HPP
 #define THREADS_HPP
 #include "tx_api.h"
+#include "IMU.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,4 +17,5 @@ void alive_thread_entry(ULONG arg);
 extern TX_SEMAPHORE sem_alive_imu;
 extern TX_SEMAPHORE sem_alive_control;
 extern volatile bool g_imu_init_ok;
+extern acc_data_t g_imu_acc_data;
 #endif

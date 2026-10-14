@@ -31,9 +31,14 @@ void imu_thread_entry(ULONG arg)
     while (1)                                                     
     {                                                             
         // TODO: 你来填（配料表里找，读加速度、读角速度、控温、put、sleep）
+
+        imu.VerifyAccData();
+        imu.VerifyGyroData();
+
         imu.ReadAccData(&imu.acc_data);
-        imu.ReadGyroData(&imu.gyro_data);
-        imu.TemperatureControl(50.0f);
+        // imu.ReadGyroData(&imu.gyro_data);
+        
+        // imu.TemperatureControl(50.0f);
         tx_semaphore_put(&sem_alive_imu);
         tx_thread_sleep(2);
     }                                                             

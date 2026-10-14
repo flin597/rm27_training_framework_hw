@@ -11,7 +11,7 @@ extern CAN_HandleTypeDef hcan2;
  */
 void CAN_Init(void)
 {
-    CAN_FilterTypeDef can_filter_st;                   ///< 定义过滤器结构体
+    CAN_FilterTypeDef can_filter_st = {};              ///< 定义过滤器结构体
     can_filter_st.FilterActivation = ENABLE;           ///< ENABLE使能过滤器
     can_filter_st.FilterMode = CAN_FILTERMODE_IDMASK;  ///< 设置过滤器模式--标识符屏蔽位模式
     can_filter_st.FilterScale = CAN_FILTERSCALE_32BIT; ///< 过滤器的位宽 32 位
@@ -19,6 +19,7 @@ void CAN_Init(void)
     can_filter_st.FilterIdLow = 0x0000;                ///< ID低位
     can_filter_st.FilterMaskIdHigh = 0x0000;           ///< 过滤器掩码高位
     can_filter_st.FilterMaskIdLow = 0x0000;            ///< 过滤器掩码低位
+    can_filter_st.SlaveStartFilterBank = 14;           ///< CAN2使用14号过滤器组起始
 
     can_filter_st.FilterBank = 0;                                      ///< 过滤器组-双CAN可指定0~27
     can_filter_st.FilterFIFOAssignment = CAN_RX_FIFO0;                 ///< 与过滤器组管理的 FIFO
@@ -26,7 +27,6 @@ void CAN_Init(void)
     HAL_CAN_Start(&hcan1);                                             ///< 使能CAN1控制器
     HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING); ///< 使能CAN的各种中断
 
-    can_filter_st.SlaveStartFilterBank = 14;                           ///< 双CAN模式下规定CAN的主从模式的过滤器分配，从过滤器为14
     can_filter_st.FilterBank = 14;                                     ///< 过滤器组-双CAN可指定0~27
     HAL_CAN_ConfigFilter(&hcan2, &can_filter_st);                      ///< HAL库配置过滤器函数
     HAL_CAN_Start(&hcan2);                                             ///< 使能CAN2控制器

@@ -45,3 +45,20 @@
 - 启用 X-CUBE-AZRTOS-F4 ThreadX 核心，节拍 1000 Hz（1 ms）
 - HAL 时基：SysTick → TIM6（避免与 ThreadX 抢 SysTick）
 - 主栈 0x800、堆 0x800（中断多 + C++ 可能 new 对象）
+
+## 10/14 threads 线程阶段 + 上板
+
+### threads 编译接线踩坑
+- `board/CMakeLists.txt` 里 include 路径手滑写成 `../threads/includ`（少了 e），编译报「找不到 threads.hpp」；改回 `../threads/include`。
+- imuthread.cpp 初始化成功判断最初写成 `!x==false`（C 里等于 `(!x)==false`，语义正好反了）。正确的是 `imu.self_test.ACC_CHIP_ID_ERR==false && imu.self_test.GYRO_CHIP_ID_ERR==false`。
+- alive 线程点灯前没先 `LED::OffAll()`，多个颜色叠加成混色；改成每轮先 `OffAll()` 再按状态点灯。
+- board/Drivers 出现 1434 个文件的换行符噪声（CubeMX 重新生成导致），用 `git restore board/Drivers` 清掉。
+
+### CAN 滤波器修复（bsp_can.cpp，待提交）
+- 原来 `CAN_FilterTypeDef` 没初始化，且 `SlaveStartFilterBank` 是给 CAN1 配完才赋值 → CAN1 拿到的是栈上垃圾值。
+- 修复：`= {}` 清零整个结构体 + 把 `SlaveStartFilterBank=14` 提到 CAN1 配置之前（该字段是给主 CAN1 用的，告诉它从机 CAN2 的滤波器从第 14 组开始）。
+
+### 首次上板（HardFault，待排查）
+- 烧录成功，但一启动就 HardFault：`pc: 0x080082f0/f2`，停在 `tx_initialize_low_level.s` 的 `__tx_HardfaultHandler` 死循环，灯不亮。
+- 排查方法：cortex-debug 里 `x/8wx $msp`，倒数第 2 个字就是崩溃 PC，据此定位崩溃行。
+- 代码层面查过 BMI088/CAN/USART/ThreadX 底层未见明显 bug，怀疑板子问题（待确认）。

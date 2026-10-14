@@ -90,6 +90,7 @@ namespace BMI088
         else if (pRxData[1] == ACC_CHIP_ID_VAL)
         {
             self_test.ACC_CHIP_ID_ERR = false;
+            self_test.INIT_ERR = false;
         }
     }
 
@@ -107,16 +108,24 @@ namespace BMI088
         else if (pRxData == GYRO_CHIP_ID_VAL)
         {
             self_test.GYRO_CHIP_ID_ERR = false;
+            self_test.INIT_ERR = false;
         }
     }
 
     void cBMI088::VerifyAccData()
     {
         // TODO: 检查加速度数据是否有效，并更新 ACC_DATA_ERR。
-        uint8_t buf[2];                                                               
+        uint8_t buf[2]; 
+           
         ReadReg(BMI088_CS_ACC, ACC_STATUS_ADDR, buf, 2);                              
-        if (buf[1] & 0x80)  self_test.ACC_DATA_ERR = false;                           
-        else                self_test.ACC_DATA_ERR = true;
+        if (buf[1] & 0x80)
+        {
+            self_test.ACC_DATA_ERR = false;
+        }
+        else
+        {
+            self_test.ACC_DATA_ERR = true;
+        }
     }
 
     void cBMI088::VerifyGyroData()
@@ -124,8 +133,14 @@ namespace BMI088
         // TODO: 检查角速度数据是否有效，并更新 GYRO_DATA_ERR。
         uint8_t status;                                                               
         ReadReg(BMI088_CS_GYRO, GYRO_INT_STAT_1_ADDR, &status, 1);                    
-        if (status & 0x80)  self_test.GYRO_DATA_ERR = false;                          
-        else                self_test.GYRO_DATA_ERR = true;
+        if (status & 0x80)
+        {
+            self_test.GYRO_DATA_ERR = false;
+        }
+        else
+        {
+            self_test.GYRO_DATA_ERR = true;
+        }
     }
 
     void cBMI088::WriteReg(enum BMI088_SENSOR cs, uint8_t addr, uint8_t *data, uint8_t len)
@@ -138,7 +153,9 @@ namespace BMI088
                                                                                                                           
         HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);   // 拉低选中                                                   
         HAL_SPI_Transmit(&BMI088_SPI, &write_addr, 1, HAL_MAX_DELAY);                                                       
-        HAL_SPI_Transmit(&BMI088_SPI, data, len, HAL_MAX_DELAY);                                                            
+        HAL_SPI_Transmit(&BMI088_SPI, data, len, HAL_MAX_DELAY);  
+
+        // HAL_SPI_Receive(&BMI088_SPI, data, 1, HAL_MAX_DELAY); // 读取一个字节，避免通信失败
         HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);     // 拉高释放
     }
 
@@ -153,7 +170,8 @@ namespace BMI088
                                                                                                                           
         HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET);                                                                 
         HAL_SPI_Transmit(&BMI088_SPI, &read_addr, 1, HAL_MAX_DELAY);                                                        
-        HAL_SPI_Receive(&BMI088_SPI, data, len, HAL_MAX_DELAY);   // 这里是收                                               
+        HAL_SPI_Receive(&BMI088_SPI, data, len, HAL_MAX_DELAY);   // 这里是收                     
+                                  
         HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET);       
     }
 
@@ -233,11 +251,11 @@ namespace BMI088
         if(data==nullptr) return;
         // TODO: 按 BMI088 加速度计 SPI 协议丢弃首个无效字节，拼接三轴有符号原始值，
         // 再按配置的量程换算为 m/s²，写入 data。
-        uint8_t buf[7];
-        ReadReg(BMI088_CS_ACC, ACC_X_LSB_ADDR, buf, 7);
-        int16_t raw_x=(int16_t)((buf[2]<<8)|buf[1]);
-        int16_t raw_y=(int16_t)((buf[4]<<8)|buf[3]);
-        int16_t raw_z=(int16_t)((buf[6]<<8)|buf[5]);
+        uint8_t buf[6];
+        ReadReg(BMI088_CS_ACC, ACC_X_LSB_ADDR, buf, 6);
+        int16_t raw_x=(int16_t)((buf[1]<<8)|buf[0]);
+        int16_t raw_y=(int16_t)((buf[3]<<8)|buf[2]);
+        int16_t raw_z=(int16_t)((buf[5]<<8)|buf[4]);
         data->x=raw_x*IMU_ACCEL_6G_SEN;
         data->y=raw_y*IMU_ACCEL_6G_SEN;
         data->z=raw_z*IMU_ACCEL_6G_SEN;
