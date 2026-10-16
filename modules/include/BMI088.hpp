@@ -2,7 +2,7 @@
 #define BMI088_HPP
 
 #include "IMU.hpp"
-
+#include "main.h"
 namespace BMI088
 {
 /**
@@ -188,7 +188,8 @@ enum BMI088_SENSOR
          * @param data 数据
          * @param len 数据长度
          */
-        void ReadReg(enum BMI088_SENSOR cs, uint8_t addr, uint8_t *data, uint8_t len);
+        // void ReadReg(enum BMI088_SENSOR cs, uint8_t addr, uint8_t *data, uint8_t len);
+        bool ReadReg(BMI088_SENSOR cs, uint8_t addr, uint8_t *data, uint8_t len);
 
         /**
          * @brief 写数据到寄存器
@@ -197,7 +198,9 @@ enum BMI088_SENSOR
          * @param data 数据
          * @param len 数据长度
          */
-        void WriteReg(enum BMI088_SENSOR cs, uint8_t addr, uint8_t *data, uint8_t len);
+        // bool WriteReg(enum BMI088_SENSOR cs, uint8_t addr, uint8_t *data, uint8_t len);
+        bool WriteReg(BMI088_SENSOR cs, uint8_t addr,
+                      const uint8_t *data, uint8_t len);
 
         void Config() override;
         void Calibrate() override;
